@@ -4,16 +4,8 @@ const path = require('path');
 const http = require('http');
 const app = express();
 
-app.locals.isProduction = process.env.NODE_ENV === 'production'
+app.locals.port = process.env.PORT || 8080;
 app.locals.eosApiHost = 'https://api.eosnewyork.io';
-
-const https = require('https');
-var fs = require('fs');
-var options = {
-  key: fs.readFileSync('certificates/private.key'),
-  cert: fs.readFileSync('certificates/certificate.crt'),
-  ca: fs.readFileSync('certificates/ca_bundle.crt')
-};
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -30,8 +22,4 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist/index.html'));
 });
 
-if(app.locals.isProduction) {
-  https.createServer(options, app).listen(443);
-} else {
-  http.createServer(app).listen(8080);
-}
+http.createServer(app).listen(app.locals.port);
