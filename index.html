@@ -116,7 +116,7 @@ function handleLoc(data_str) {
 	var data = JSON.parse(data_str);
 	//parseLocData(data);
 	var marker = L.marker([data.lat, data.lon]);
-	marker.bindTooltip(data.id);
+	marker.bindTooltip(data.id.replace('_', ' :: '));
 	
 	if(data.id.split('_')[1] === 'p2p') {
 		p2pMarkers.push(marker);
