@@ -18,6 +18,7 @@
   "homepage": "https://github.com/ghoti143/bpmap#readme",
   "dependencies": {
     "express": "^4.16.3",
-    "request": "^2.87.0"
+    "request": "^2.87.0",
+    "ssl-express-www": "^3.0.0"
   }
 }
