@@ -2,13 +2,11 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const http = require('http');
-const secure = require('ssl-express-www');
 const app = express();
 
 app.locals.port = process.env.PORT || 8080;
 app.locals.eosApiHost = 'https://api.eosnewyork.io';
 
-app.use(secure);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
