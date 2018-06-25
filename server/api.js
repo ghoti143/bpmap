@@ -2,8 +2,8 @@ const router = require('express').Router();
 const producers = require('./producers');
 
 router.get('/load', function(req, res) {
-  producers.load();
-  res.send('load.  list: ' + producers.list.toString());
+  var foo = producers.getTop30();
+  res.send(foo);
 });
 
 router.get('/clear', function(req, res) {

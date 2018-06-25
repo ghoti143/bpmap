@@ -1,18 +1,20 @@
 const request = require('request');
 const R = require('ramda');
+const loki = require('lokijs');
 
 class Producers {
   constructor() {
-    this.list = [];
     this.lastFetchDate = Date.now();
+    this.db = new loki("loki.json");
+    this.list = this.db.addCollection('producers');
   }
 
   clear() {
-    this.list = [];
+    this.list.clear();
   }
 
-  load() {
-    this.list = ['foo', 'bar'];
+  getTop30() {
+    return this.list.chain().find().limit(30).data();
   }
 
   foo(eosApiHost) {
@@ -31,25 +33,20 @@ class Producers {
 
     return new Promise(function(resolve, reject) {
     // Do async job
-      var elapsed = currDate - self.lastFetchDate;
-      if(elapsed > 10000 || self.list.length === 0) {
-        console.log(' :: ' + self.list.length);
-        console.log('refreshing prod data :: ' + elapsed.toString());
-        request.post(options, function(err, resp, body) {
-          if (err) {
-            reject(err);
-          } else {
-            self.list = R.sort(comp, body.rows);
+      
+      console.log('refreshing prod data :: ');
+      request.post(options, function(err, resp, body) {
+        if (err) {
+          reject(err);
+        } else {
+          var sortedList = R.sort(comp, body.rows);
 
-            self.lastFetchDate = Date.now();
-            resolve(self.list);
+          for(var i = 0; i < sortedList.length; i++) {
+            self.list.insert(sortedList[i]);
           }
-        });
-      } else {
-        console.log('using cached prod data');
-        resolve(self.list);
-      }
-
+          resolve();
+        }
+      });
     });
   }
 }
