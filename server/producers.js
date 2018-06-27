@@ -15,10 +15,10 @@ class Producers {
   }
 
   loadBpJson() {
-    var foo = this.get();
-    for(var i = 0; i < foo.length; i++) {
-      var url = `${foo[i].url}/bp.json`;
-      request.get(url, this.loadBpJson_done.bind(this, foo[i]));
+    var bps = this.get();
+    for(var i = 0; i < bps.length; i++) {
+      var url = `${bps[i].url}/bp.json`;
+      request.get(url, this.loadBpJson_done.bind(this, bps[i]));
     }
   }
 
@@ -34,14 +34,44 @@ class Producers {
         console.log(`get bp.json :: FIN ${bp.url}`);
       } catch(e) {
         console.log(`get bp.json :: ERR :: ${e} :: ${bp.url}`);
+        bp.bp_info = "error";
       }      
     }
   }
 
+  createIpStackUrl(hostname) {
+    hostname = hostname.replace("http://", "");
+    hostname = hostname.replace("https://", "");
+    hostname = hostname.split(':')[0];
+    hostname = hostname.replace("/", "");
+    var url = `http://api.ipstack.com/${hostname}?access_key=82d33e369e0d885b6b8a16ba42399b77&fields=latitude,longitude`;
+    return url;
+  }
+
   loadServerLocations(bp) {
     if(bp.bp_info && bp.bp_info.nodes && bp.bp_info.nodes[0].p2p_endpoint) {
-      console.log(bp.bp_info.nodes[0].p2p_endpoint);
-      bp.bp_info.nodes[0].p2p_location = {"latitude": "foo", "longitude": "bar"};
+      var url = this.createIpStackUrl(bp.bp_info.nodes[0].p2p_endpoint);
+      request.get(url, this.loadServerLocations_done.bind(this, bp.bp_info.nodes[0], 'p2p_location'));
+    }
+    if(bp.bp_info && bp.bp_info.nodes && bp.bp_info.nodes[0].api_endpoint) {
+      var url = this.createIpStackUrl(bp.bp_info.nodes[0].api_endpoint);
+      request.get(url, this.loadServerLocations_done.bind(this, bp.bp_info.nodes[0], 'api_location'));
+    }
+  }
+
+  loadServerLocations_done(node, prop, err, resp, body) {
+    if (err) {
+      console.log(`get location :: ERR :: ${err}`);
+      node[prop] = "error";
+    } else {
+      try {
+        node[prop] = JSON.parse(body);
+
+        console.log(`get location :: FIN`);
+      } catch(e) {
+        console.log(`get location :: ERR :: ${e}`);
+        node[prop] = "error";
+      }      
     }
   }
 
