@@ -1,5 +1,4 @@
-const request = require('request')
-const requestp = require('request-promise-native')
+const request = require('request-promise-native')
 const loki = require('lokijs')
 const R = require('ramda')
 
@@ -12,32 +11,25 @@ class Producers {
   }  
 
   get(limit = 30) {
-    return this.list.chain().find().limit(limit).data();
+    return this.list.chain().find().limit(limit).data()
   }
 
-  async loadBpJson() {
-    const bps = this.get(10)
+  async loadBpJson(bp) {
+    const url = `${bp.url}/bp.json`
     
-    for(let i = 0; i < bps.length; i++) {
-      let bp = bps[i]
-      const url = `${bp.url}/bp.json`
-      let response
+    console.log(`get bp.json :: START :: ${bp.url}`)
+    
+    try {        
+      let response = await request(url)
+      bp.bp_info = JSON.parse(response)
+      console.log(`get bp.json :: FIN :: ${bp.url}`)
+    } catch(err) {
+      console.error(`get bp.json :: ${err} :: ${bp.url}`)
+      bp.bp_info = "error"
+    }
 
-      console.log(`get bp.json :: START :: ${bp.url}`)
-      
-      try {
-        
-        response = await requestp(url)
-        bp.bp_info = JSON.parse(response)
-        console.log(`get bp.json :: FIN :: ${bp.url}`)
-      } catch(err) {
-        console.error(`get bp.json :: ${err} :: ${bp.url}`)
-        bp.bp_info = "error"
-      }
-
-      await this.loadServerLocation(bp, 'p2p')
-      await this.loadServerLocation(bp, 'api')
-    }    
+    await this.loadServerLocation(bp, 'p2p')
+    await this.loadServerLocation(bp, 'api')
   }
 
   createGeocodeUrl(hostname) {
@@ -46,6 +38,7 @@ class Producers {
     hostname = hostname.split(':')[0]
     hostname = hostname.replace("/", "")
     return `http://ip-api.com/json/${hostname}`
+    //return "https://jsonplaceholder.typicode.com/posts/1"
   }
 
   async loadServerLocation(bp, type) {
@@ -57,7 +50,7 @@ class Producers {
 
     try {
       const url = this.createGeocodeUrl(bp.bp_info.nodes[0][epParam])
-      response = await requestp(url)
+      response = await request(url)
       bp[locParam] = JSON.parse(response)
       console.log(`get location :: FIN :: ${bp.url}`)
     } catch(err) {
@@ -70,20 +63,22 @@ class Producers {
     const options = {
       url: `${this.apiHost}/v1/chain/get_table_rows`,
       json: { 'scope':'eosio', 'code':'eosio', 'table':'producers', 'json': true, 'limit': 5000 }
-    }    
-    let response
+    }
 
     console.log('refresh prod data :: START')      
       
     try {
-      response = await requestp.post(options)
+      let response = await request.post(options)
       let sortedList = R.sort((a, b) => {
         return parseFloat(b.total_votes) - parseFloat(a.total_votes)
       }, response.rows)
       
-      this.list.clear()    
+      this.list.clear()
       this.list.insert(sortedList)
-      await this.loadBpJson()
+      
+      const bps = this.get(2)    
+      await Promise.all(bps.map(this.loadBpJson.bind(this)))
+
       console.log('refresh prod data :: FIN');
     } catch(err) {
       console.error(`refresh prod data :: ${err}`);

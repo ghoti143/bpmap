@@ -21,15 +21,13 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist/index.html'))
 })
 
-async function start() {
-  await app.producers.loadProducers()
-  http.createServer(app).listen(app.locals.port)
-  console.log(`listening on port ${app.locals.port}`)
-  const job = schedule.scheduleJob('*/1 * * * *', app.producers.loadProducers.bind(app.producers));
-}
-
 try {
-  start()
+  (async () => {
+    await app.producers.loadProducers()
+    http.createServer(app).listen(app.locals.port)
+    console.log(`listening on port ${app.locals.port}`)
+    const job = schedule.scheduleJob('*/1 * * * *', app.producers.loadProducers.bind(app.producers));
+  })()
 } catch(err) {
   console.error(err);
 }
