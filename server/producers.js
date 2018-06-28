@@ -1,111 +1,95 @@
-const request = require('request');
-const loki = require('lokijs');
-const R = require('ramda');
+const request = require('request')
+const requestp = require('request-promise-native')
+const loki = require('lokijs')
+const R = require('ramda')
 
 class Producers {
   constructor(apiHost) {
-    this.apiHost = apiHost;
-    this.lastFetchDate = Date.now();
-    this.db = new loki("loki.json");
-    this.list = this.db.addCollection('producers');
+    this.apiHost = apiHost
+    this.lastFetchDate = Date.now()
+    this.db = new loki("loki.json")
+    this.list = this.db.addCollection('producers')
   }  
 
   get(limit = 30) {
     return this.list.chain().find().limit(limit).data();
   }
 
-  loadBpJson() {
-    var bps = this.get();
-    for(var i = 0; i < bps.length; i++) {
-      var url = `${bps[i].url}/bp.json`;
-      request.get(url, this.loadBpJson_done.bind(this, bps[i]));
-    }
-  }
+  async loadBpJson() {
+    const bps = this.get(10)
+    
+    for(let i = 0; i < bps.length; i++) {
+      let bp = bps[i]
+      const url = `${bp.url}/bp.json`
+      let response
 
-  loadBpJson_done(bp, err, resp, body) {
-    if (err) {
-      console.log(`get bp.json :: ERR :: file not found :: ${bp.url}`);
-      bp.bp_info = "error";
-    } else {
+      console.log(`get bp.json :: START :: ${bp.url}`)
+      
       try {
-        bp.bp_info = JSON.parse(body);
-        this.loadServerLocations(bp);
+        
+        response = await requestp(url)
+        bp.bp_info = JSON.parse(response)
+        console.log(`get bp.json :: FIN :: ${bp.url}`)
+      } catch(err) {
+        console.error(`get bp.json :: ${err} :: ${bp.url}`)
+        bp.bp_info = "error"
+      }
 
-        console.log(`get bp.json :: FIN ${bp.url}`);
-      } catch(e) {
-        console.log(`get bp.json :: ERR :: ${e} :: ${bp.url}`);
-        bp.bp_info = "error";
-      }      
-    }
+      await this.loadServerLocation(bp, 'p2p')
+      await this.loadServerLocation(bp, 'api')
+    }    
   }
 
-  createIpStackUrl(hostname) {
-    hostname = hostname.replace("http://", "");
-    hostname = hostname.replace("https://", "");
-    hostname = hostname.split(':')[0];
-    hostname = hostname.replace("/", "");
-    var url = `http://api.ipstack.com/${hostname}?access_key=82d33e369e0d885b6b8a16ba42399b77&fields=latitude,longitude`;
-    return url;
+  createGeocodeUrl(hostname) {
+    hostname = hostname.replace("http://", "")
+    hostname = hostname.replace("https://", "")
+    hostname = hostname.split(':')[0]
+    hostname = hostname.replace("/", "")
+    return `http://ip-api.com/json/${hostname}`
   }
 
-  loadServerLocations(bp) {
-    if(bp.bp_info && bp.bp_info.nodes && bp.bp_info.nodes[0].p2p_endpoint) {
-      var url = this.createIpStackUrl(bp.bp_info.nodes[0].p2p_endpoint);
-      request.get(url, this.loadServerLocations_done.bind(this, bp.bp_info.nodes[0], 'p2p_location'));
-    }
-    if(bp.bp_info && bp.bp_info.nodes && bp.bp_info.nodes[0].api_endpoint) {
-      var url = this.createIpStackUrl(bp.bp_info.nodes[0].api_endpoint);
-      request.get(url, this.loadServerLocations_done.bind(this, bp.bp_info.nodes[0], 'api_location'));
-    }
+  async loadServerLocation(bp, type) {
+    const epParam = `${type}_endpoint`
+    const locParam = `${type}_location`
+    let response
+    
+    console.log(`get location :: START :: ${bp.url}`)
+
+    try {
+      const url = this.createGeocodeUrl(bp.bp_info.nodes[0][epParam])
+      response = await requestp(url)
+      bp[locParam] = JSON.parse(response)
+      console.log(`get location :: FIN :: ${bp.url}`)
+    } catch(err) {
+      console.error(`get location :: ${err} :: ${bp.url}`)
+      bp[locParam] = "error"
+    }    
   }
 
-  loadServerLocations_done(node, prop, err, resp, body) {
-    if (err) {
-      console.log(`get location :: ERR :: ${err}`);
-      node[prop] = "error";
-    } else {
-      try {
-        node[prop] = JSON.parse(body);
-
-        console.log(`get location :: FIN`);
-      } catch(e) {
-        console.log(`get location :: ERR :: ${e}`);
-        node[prop] = "error";
-      }      
-    }
-  }
-
-  loadProducers(eosApiHost) {
-    var options = {
+  async loadProducers() {
+    const options = {
       url: `${this.apiHost}/v1/chain/get_table_rows`,
       json: { 'scope':'eosio', 'code':'eosio', 'table':'producers', 'json': true, 'limit': 5000 }
-    };
-    // Return new promise 
-    var self = this;
-    
-    return new Promise(function(resolve, reject) {
-    // Do async job
+    }    
+    let response
+
+    console.log('refresh prod data :: START')      
       
-      console.log('refresh prod data :: START');
-      request.post(options, function(err, resp, body) {
-        if (err) {
-          console.log('refresh prod data :: ERR');
-          reject(err);
-        } else {
-          
-          var sortedList = R.sort((a, b) => {
-            return parseFloat(b.total_votes) - parseFloat(a.total_votes);
-          }, body.rows);
-          
-          self.list.clear();          
-          self.list.insert(sortedList);
-          self.loadBpJson();
-          console.log('refresh prod data :: FIN');
-          resolve();
-        }
-      });
-    });
-  }
+    try {
+      response = await requestp.post(options)
+      let sortedList = R.sort((a, b) => {
+        return parseFloat(b.total_votes) - parseFloat(a.total_votes)
+      }, response.rows)
+      
+      this.list.clear()    
+      this.list.insert(sortedList)
+      await this.loadBpJson()
+      console.log('refresh prod data :: FIN');
+    } catch(err) {
+      console.error(`refresh prod data :: ${err}`);
+      throw "failed to load producers";
+    }    
+  } 
 }
 
-module.exports = Producers;
+module.exports = Producers
