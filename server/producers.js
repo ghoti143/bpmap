@@ -23,13 +23,12 @@ class Producers {
       let response = await request(url)
       bp.bp_info = JSON.parse(response)
       console.log(`get bp.json :: FIN :: ${bp.url}`)
+      await this.loadServerLocation(bp, 'p2p')
+      await this.loadServerLocation(bp, 'api')
     } catch(err) {
       console.error(`get bp.json :: ${err} :: ${bp.url}`)
       bp.bp_info = "error"
     }
-
-    await this.loadServerLocation(bp, 'p2p')
-    await this.loadServerLocation(bp, 'api')
   }
 
   createGeocodeUrl(hostname) {
@@ -37,8 +36,10 @@ class Producers {
     hostname = hostname.replace("https://", "")
     hostname = hostname.split(':')[0]
     hostname = hostname.replace("/", "")
-    return `http://ip-api.com/json/${hostname}`
+    //return `http://ip-api.com/json/${hostname}`
     //return "https://jsonplaceholder.typicode.com/posts/1"
+    //return `https://tools.keycdn.com/geo.json?host=${hostname}`    
+    return `http://ip.kitpes.com/?ip=${hostname}`
   }
 
   async loadServerLocation(bp, type) {
@@ -47,6 +48,8 @@ class Producers {
     let response
     
     console.log(`get location :: START :: ${bp.url}`)
+
+    if(!bp.bp_info.nodes[0][epParam]) return
 
     try {
       const url = this.createGeocodeUrl(bp.bp_info.nodes[0][epParam])
@@ -76,7 +79,7 @@ class Producers {
       this.list.clear()
       this.list.insert(sortedList)
       
-      const bps = this.get(2)    
+      const bps = this.get()    
       await Promise.all(bps.map(this.loadBpJson.bind(this)))
 
       console.log('refresh prod data :: FIN');
