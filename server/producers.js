@@ -20,7 +20,7 @@ class Producers {
     console.log(`get bp.json :: START :: ${bp.url}`)
     
     try {        
-      let response = await request(url)
+      let response = await request(url, {'timeout': 5000})
       bp.bp_info = JSON.parse(response)
       console.log(`get bp.json :: FIN :: ${bp.url}`)
       await this.loadServerLocation(bp, 'p2p')
@@ -36,10 +36,10 @@ class Producers {
     hostname = hostname.replace("https://", "")
     hostname = hostname.split(':')[0]
     hostname = hostname.replace("/", "")
-    //return `http://ip-api.com/json/${hostname}`
+    return `http://ip-api.com/json/${hostname}`
     //return "https://jsonplaceholder.typicode.com/posts/1"
     //return `https://tools.keycdn.com/geo.json?host=${hostname}`    
-    return `http://ip.kitpes.com/?ip=${hostname}`
+    //return `http://ip.kitpes.com/?ip=${hostname}`
   }
 
   async loadServerLocation(bp, type) {
