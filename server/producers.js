@@ -1,93 +1,125 @@
 const request = require('request-promise-native')
-const loki = require('lokijs')
 const R = require('ramda')
+const { Resolver } = require('dns')
+const NodeCache = require( "node-cache" );
 
 class Producers {
   constructor(apiHost) {
     this.apiHost = apiHost
-    this.lastFetchDate = Date.now()
-    this.db = new loki("loki.json")
-    this.list = this.db.addCollection('producers')
-  }  
-
-  get(limit = 30) {
-    return this.list.chain().find().limit(limit).data()
+    this.resolver = new Resolver();
+    this.resolver.setServers(['8.8.8.8'])
+    
+    this.producerCache = new NodeCache({stdTTL: 120})
+    this.bpJsonCache = new NodeCache({stdTTL: 5000})
+    this.dnsCache = new NodeCache({stdTTL: 5000})
+    this.locationCache = new NodeCache({stdTTL: 10000})
+    
+    this.geolocUrl = 'https://api.ipgeolocation.io/ipgeo?fields=latitude,longitude,isp,city&apiKey=e60b30a218394388a4ad62344f07cf47&ip='
+    this.limit = 30;
   }
 
-  async loadBpJson(bp) {
-    const url = `${bp.url}/bp.json`
+  async loadBpJson(producer) {
+    const url = `${producer.url}/bp.json`
+    let bpJson = this.bpJsonCache.get(url)
     
-    console.log(`get bp.json :: START :: ${bp.url}`)
-    
-    try {        
-      let response = await request(url, {'timeout': 5000})
-      bp.bp_info = JSON.parse(response)
-      console.log(`get bp.json :: FIN :: ${bp.url}`)
-      await this.loadServerLocation(bp, 'p2p')
-      await this.loadServerLocation(bp, 'api')
-    } catch(err) {
-      console.error(`get bp.json :: ${err} :: ${bp.url}`)
-      bp.bp_info = "error"
+    if(bpJson == undefined) {
+      console.log(`reloading ${url}`)
+      try {
+        let response = await request(url, {'timeout': 5000})
+        bpJson = JSON.parse(response)
+        this.bpJsonCache.set(url, bpJson)
+      } catch(err) {
+        bpJson = "error"
+      }
+    }
+
+    producer.bp_json = bpJson
+    await Promise.all(producer.bp_json.nodes.map(this.loadNodeLocations.bind(this)))
+  }
+
+  async loadNodeLocations(node) {
+    if(node.p2p_endpoint) {
+      node.p2p_loc = await this.loadLocation(node.p2p_endpoint)
+    }
+
+    if(node.api_endpoint) {
+      node.api_loc = await this.loadLocation(node.api_endpoint)
     }
   }
 
-  createGeocodeUrl(hostname) {
+  async loadLocation(endpoint) {    
+    const ipaddr = await this.resolveHost(endpoint)
+    let location = this.locationCache.get(ipaddr)
+
+    if (location == undefined) {
+      try {
+        const url = `${this.geolocUrl}${ipaddr}`
+        console.log(url)
+        const response = await request(url)
+        location = JSON.parse(response)
+        this.locationCache.set(ipaddr, location)
+      } catch(err) {
+        location = "error"
+      }
+    }
+
+    return location
+  }
+
+  async resolveHost(hostname) {
     hostname = hostname.replace("http://", "")
     hostname = hostname.replace("https://", "")
     hostname = hostname.split(':')[0]
     hostname = hostname.replace("/", "")
-    return `http://ip-api.com/json/${hostname}`
-    //return "https://jsonplaceholder.typicode.com/posts/1"
-    //return `https://tools.keycdn.com/geo.json?host=${hostname}`    
-    //return `http://ip.kitpes.com/?ip=${hostname}`
-  }
 
-  async loadServerLocation(bp, type) {
-    const epParam = `${type}_endpoint`
-    const locParam = `${type}_location`
-    let response
-    
-    console.log(`get location :: START :: ${bp.url}`)
+    const self = this
 
-    if(!bp.bp_info.nodes[0][epParam]) return
-
-    try {
-      const url = this.createGeocodeUrl(bp.bp_info.nodes[0][epParam])
-      response = await request(url)
-      bp[locParam] = JSON.parse(response)
-      console.log(`get location :: FIN :: ${bp.url}`)
-    } catch(err) {
-      console.error(`get location :: ${err} :: ${bp.url}`)
-      bp[locParam] = "error"
-    }    
+    return new Promise((resolve) => {
+      let ipaddr = this.dnsCache.get(hostname)
+      
+      if(ipaddr == undefined) {
+        self.resolver.resolve4(hostname, (err, addresses) => {
+          if (err || !addresses) return resolve("error")
+          ipaddr = addresses[0]
+          self.dnsCache.set(hostname, ipaddr)
+          resolve(ipaddr)
+        })
+      } else {
+        resolve(ipaddr)
+      }
+    })
   }
 
   async loadProducers() {
-    const options = {
-      url: `${this.apiHost}/v1/chain/get_table_rows`,
-      json: { 'scope':'eosio', 'code':'eosio', 'table':'producers', 'json': true, 'limit': 5000 }
+    const cacheKey = 'producers'
+    let sortedList = this.producerCache.get(cacheKey)
+    
+    if(sortedList === undefined) {
+      try {
+        const options = {
+          url: `${this.apiHost}/v1/chain/get_table_rows`,
+          json: { 'scope':'eosio', 'code':'eosio', 'table':'producers', 'json': true, 'limit': 5000 }
+        }
+        let response = await request.post(options)
+        sortedList = R.sort((a, b) => {
+          return parseFloat(b.total_votes) - parseFloat(a.total_votes)
+        }, response.rows)
+        
+        this.producerCache.set(cacheKey, sortedList)
+
+      } catch(err) {
+        throw "failed to load producers"
+      }
     }
 
-    console.log('refresh prod data :: START')      
-      
-    try {
-      let response = await request.post(options)
-      let sortedList = R.sort((a, b) => {
-        return parseFloat(b.total_votes) - parseFloat(a.total_votes)
-      }, response.rows)
-      
-      this.list.clear()
-      this.list.insert(sortedList)
-      
-      const bps = this.get()    
-      await Promise.all(bps.map(this.loadBpJson.bind(this)))
+    return sortedList.slice(0, this.limit)
+  }
 
-      console.log('refresh prod data :: FIN');
-    } catch(err) {
-      console.error(`refresh prod data :: ${err}`);
-      throw "failed to load producers";
-    }    
-  } 
+  async load() {
+    let producers = await this.loadProducers()
+    await Promise.all(producers.map(this.loadBpJson.bind(this)))
+    return producers
+  }
 }
 
 module.exports = Producers

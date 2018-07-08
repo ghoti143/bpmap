@@ -46,32 +46,40 @@ function initMap() {
 	
 function processBPs(){
 
-	for (var idx in bps) {
-		var bp = bps[idx];
-		
-		createMarker(bp, 'p2p');
-		createMarker(bp, 'api');
+	for (var i in bps) {
+		var bp = bps[i];
+
+		for(var j in bp.bp_json.nodes) {
+			var node = bp.bp_json.nodes[j];
+			if(node.p2p_loc && node.p2p_loc.latitude) {
+				createMarker(bp, node.p2p_loc, 'p2p');
+			}
+			if(node.api_loc && node.api_loc.latitude) {
+				createMarker(bp, node.api_loc, 'api');
+			}
+		}
 	}
 }
 
-function createMarker(bp, type) {
-	var prop = type + '_location';
-	if(bp && bp[prop] && bp[prop].lat && bp[prop].lon) {
-		var marker = L.marker([bp[prop].lat, bp[prop].lon]);
-		marker.bindTooltip(bp.bp_info.org.candidate_name + ' :: ' + type);
+function createMarker(bp, loc, type) {
+	
+	var marker = L.marker([loc.latitude, loc.longitude]);
+	marker.bindTooltip(bp.bp_json.org.candidate_name + ' :: ' + type);
 
-		var img = bp.bp_info.org.branding.logo_256;
-		var popup = '<h1>' + bp.bp_info.org.candidate_name + '</h1>' +
-					'<img style="height: 50; width: 50;" src="' + img + '"></img><br />' + 
-					'<span>' + bp[prop].isp + '</span>';
+	var img = "http://www.troublefixers.com/wp-content/uploads/2013/03/Broken-Image.png";
+	if(bp.bp_json.org.branding && bp.bp_json.org.branding.logo_256) {
+		img = bp.bp_json.org.branding.logo_256;
+	}
+	var popup = '<h1>' + bp.bp_json.org.candidate_name + '</h1>' +
+				'<img style="height: 50; width: 50;" src="' + img + '"></img><br />' + 
+				'<span>' + loc.isp + '</span>';
 
-		marker.bindPopup(popup);
-		
-		if(type === 'p2p') {
-			p2pMarkers.push(marker);
-		} else {
-			apiMarkers.push(marker);
-		}		
+	marker.bindPopup(popup);
+	
+	if(type === 'p2p') {
+		p2pMarkers.push(marker);
+	} else {
+		apiMarkers.push(marker);
 	}	
 }
 
