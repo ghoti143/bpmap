@@ -1,7 +1,7 @@
 const request = require('request-promise-native')
 const R = require('ramda')
 const { Resolver } = require('dns')
-const NodeCache = require( "node-cache" );
+const NodeCache = require( "node-cache" )
 
 class Producers {
   constructor(apiHost) {
@@ -15,7 +15,7 @@ class Producers {
     this.locationCache = new NodeCache({stdTTL: 10000})
     
     this.geolocUrl = 'https://api.ipgeolocation.io/ipgeo?fields=latitude,longitude,isp,city&apiKey=e60b30a218394388a4ad62344f07cf47&ip='
-    this.limit = 30;
+    this.limit = 30
   }
 
   async loadBpJson(producer) {
@@ -23,8 +23,8 @@ class Producers {
     let bpJson = this.bpJsonCache.get(url)
     
     if(bpJson == undefined) {
-      console.log(`reloading ${url}`)
       try {
+        console.log(`reloading bp.json ${url}`)
         let response = await request(url, {'timeout': 5000})
         bpJson = JSON.parse(response)
         this.bpJsonCache.set(url, bpJson)
@@ -51,15 +51,19 @@ class Producers {
     const ipaddr = await this.resolveHost(endpoint)
     let location = this.locationCache.get(ipaddr)
 
+    if(ipaddr == 'error') {
+      return 'error'
+    }
+
     if (location == undefined) {
       try {
         const url = `${this.geolocUrl}${ipaddr}`
-        console.log(url)
+        console.log(`geocoding ip ${ipaddr}`)
         const response = await request(url)
         location = JSON.parse(response)
         this.locationCache.set(ipaddr, location)
       } catch(err) {
-        location = "error"
+        location = 'error'
       }
     }
 
@@ -67,10 +71,10 @@ class Producers {
   }
 
   async resolveHost(hostname) {
-    hostname = hostname.replace("http://", "")
-    hostname = hostname.replace("https://", "")
+    hostname = hostname.replace('http://', '')
+    hostname = hostname.replace('https://', '')
     hostname = hostname.split(':')[0]
-    hostname = hostname.replace("/", "")
+    hostname = hostname.replace('/', '')
 
     const self = this
 
@@ -78,8 +82,9 @@ class Producers {
       let ipaddr = this.dnsCache.get(hostname)
       
       if(ipaddr == undefined) {
+        console.log(`resolving hostname ${hostname}`)
         self.resolver.resolve4(hostname, (err, addresses) => {
-          if (err || !addresses) return resolve("error")
+          if (err || !addresses) return resolve('error')
           ipaddr = addresses[0]
           self.dnsCache.set(hostname, ipaddr)
           resolve(ipaddr)
@@ -100,6 +105,7 @@ class Producers {
           url: `${this.apiHost}/v1/chain/get_table_rows`,
           json: { 'scope':'eosio', 'code':'eosio', 'table':'producers', 'json': true, 'limit': 5000 }
         }
+        console.log(`reloading producers ${options.url}`)
         let response = await request.post(options)
         sortedList = R.sort((a, b) => {
           return parseFloat(b.total_votes) - parseFloat(a.total_votes)
@@ -108,7 +114,7 @@ class Producers {
         this.producerCache.set(cacheKey, sortedList)
 
       } catch(err) {
-        throw "failed to load producers"
+        throw 'failed to load producers'
       }
     }
 
