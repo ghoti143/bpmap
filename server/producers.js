@@ -1,20 +1,16 @@
 const request = require('request-promise-native')
 const R = require('ramda')
-const { Resolver } = require('dns')
+//const { Resolver } = require('dns')
 const NodeCache = require( "node-cache" )
 
 class Producers {
   constructor(apiHost) {
     this.apiHost = apiHost
-    this.resolver = new Resolver();
-    this.resolver.setServers(['8.8.8.8'])
-    
     this.producerCache = new NodeCache({stdTTL: 120})
     this.bpJsonCache = new NodeCache({stdTTL: 5000})
-    this.dnsCache = new NodeCache({stdTTL: 5000})
     this.locationCache = new NodeCache({stdTTL: 10000})
     
-    this.geolocUrl = 'https://api.ipgeolocation.io/ipgeo?fields=latitude,longitude,isp,city&apiKey=e60b30a218394388a4ad62344f07cf47&ip='
+    this.geolocUrl = 'http://ip-api.com/json/'
     this.limit = 30
   }
 
@@ -48,20 +44,16 @@ class Producers {
   }
 
   async loadLocation(endpoint) {    
-    const ipaddr = await this.resolveHost(endpoint)
-    let location = this.locationCache.get(ipaddr)
-
-    if(ipaddr == 'error') {
-      return 'error'
-    }
+    const hostname = this.parseHost(endpoint)
+    let location = this.locationCache.get(hostname)
 
     if (location == undefined) {
       try {
-        const url = `${this.geolocUrl}${ipaddr}`
-        console.log(`geocoding ip ${ipaddr}`)
+        const url = `${this.geolocUrl}${hostname}`
+        console.log(`geocoding ip ${hostname}`)
         const response = await request(url)
         location = JSON.parse(response)
-        this.locationCache.set(ipaddr, location)
+        this.locationCache.set(hostname, location)
       } catch(err) {
         location = 'error'
       }
@@ -70,29 +62,13 @@ class Producers {
     return location
   }
 
-  async resolveHost(hostname) {
+  parseHost(hostname) {
     hostname = hostname.replace('http://', '')
     hostname = hostname.replace('https://', '')
     hostname = hostname.split(':')[0]
     hostname = hostname.replace('/', '')
 
-    const self = this
-
-    return new Promise((resolve) => {
-      let ipaddr = this.dnsCache.get(hostname)
-      
-      if(ipaddr == undefined) {
-        console.log(`resolving hostname ${hostname}`)
-        self.resolver.resolve4(hostname, (err, addresses) => {
-          if (err || !addresses) return resolve('error')
-          ipaddr = addresses[0]
-          self.dnsCache.set(hostname, ipaddr)
-          resolve(ipaddr)
-        })
-      } else {
-        resolve(ipaddr)
-      }
-    })
+    return hostname
   }
 
   async loadProducers() {

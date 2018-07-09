@@ -51,27 +51,29 @@ function processBPs(){
 
 		for(var j in bp.bp_json.nodes) {
 			var node = bp.bp_json.nodes[j];
-			if(node.p2p_loc && node.p2p_loc.latitude) {
-				createMarker(bp, node.p2p_loc, 'p2p');
+			if(node.p2p_loc && node.p2p_loc.lat) {
+				createMarker(bp, node, 'p2p');
 			}
-			if(node.api_loc && node.api_loc.latitude) {
-				createMarker(bp, node.api_loc, 'api');
+			if(node.api_loc && node.api_loc.lat) {
+				createMarker(bp, node, 'api');
 			}
 		}
 	}
 }
 
-function createMarker(bp, loc, type) {
+function createMarker(bp, node, type) {
 	
-	var marker = L.marker([loc.latitude, loc.longitude]);
-	marker.bindTooltip(bp.bp_json.org.candidate_name + ' :: ' + type);
+	var locprop = type + '_loc';
+	var loc = node[locprop];
+	var marker = L.marker([loc.lat, loc.lon]);
+	marker.bindTooltip(bp.bp_json.org.candidate_name + '<br /><b>' + node.api_endpoint + '</b> (' + loc.query + ')');
 
-	var img = "http://www.troublefixers.com/wp-content/uploads/2013/03/Broken-Image.png";
+	var img = "https://cdn.iconscout.com/public/images/icon/free/png-512/eos-cryptocurrency-crypto-currency-coin-logo-3cbf68c28ac9549e-512x512.png";
 	if(bp.bp_json.org.branding && bp.bp_json.org.branding.logo_256) {
 		img = bp.bp_json.org.branding.logo_256;
 	}
 	var popup = '<h1>' + bp.bp_json.org.candidate_name + '</h1>' +
-				'<img style="height: 50; width: 50;" src="' + img + '"></img><br />' + 
+				'<img style="height: 50;" src="' + img + '"></img><br />' + 
 				'<span>' + loc.isp + '</span>';
 
 	marker.bindPopup(popup);
