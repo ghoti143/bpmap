@@ -46,38 +46,45 @@ function initMap() {
 	
 function processBPs(){
 
-	for (var i in bps) {
+	for (var i = 0; i < bps.length; i++) {
 		var bp = bps[i];
+		var rank = i+1;
 
-		for(var j in bp.bp_json.nodes) {
+		for(var j = 0; j < bp.bp_json.nodes.length; j++) {
 			var node = bp.bp_json.nodes[j];
-			if(node.p2p_loc && node.p2p_loc.lat) {
-				createMarker(bp, node, 'p2p');
+			if(node.p2p_loc && node.p2p_loc.latitude) {
+				createMarker(bp, node, 'p2p', rank);
 			}
-			if(node.api_loc && node.api_loc.lat) {
-				createMarker(bp, node, 'api');
+			if(node.api_loc && node.api_loc.latitude) {
+				createMarker(bp, node, 'api', rank);
 			}
 		}
 	}
 }
 
-function createMarker(bp, node, type) {
+function createMarker(bp, node, type, rank) {
 	
 	var locprop = type + '_loc';
 	var loc = node[locprop];
-	var marker = L.marker([loc.lat, loc.lon]);
-	marker.bindTooltip(bp.bp_json.org.candidate_name + '<br /><b>' + node.api_endpoint + '</b> (' + loc.query + ')');
+	var marker = L.marker([loc.latitude, loc.longitude]);
 
 	var img = "https://cdn.iconscout.com/public/images/icon/free/png-512/eos-cryptocurrency-crypto-currency-coin-logo-3cbf68c28ac9549e-512x512.png";
 	if(bp.bp_json.org.branding && bp.bp_json.org.branding.logo_256) {
 		img = bp.bp_json.org.branding.logo_256;
 	}
+
+	var tooltip = '<h2>' + bp.bp_json.org.candidate_name + ' (' + rank.toString() + ')</h2>' +
+				 '<img style="height: 50;" src="' + img + '"></img><br />' + 
+				 '<b>' + node.api_endpoint + '</b> (' + loc.ip + ')'
+	marker.bindTooltip(tooltip);
+	/*
 	var popup = '<h1>' + bp.bp_json.org.candidate_name + '</h1>' +
 				'<img style="height: 50;" src="' + img + '"></img><br />' + 
-				'<span>' + loc.isp + '</span>';
+				'<span>' + loc.city + ', ' + loc.country_name + '</span>';
 
 	marker.bindPopup(popup);
-	
+	*/
+
 	if(type === 'p2p') {
 		p2pMarkers.push(marker);
 	} else {

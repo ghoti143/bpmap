@@ -1,6 +1,5 @@
 const request = require('request-promise-native')
 const R = require('ramda')
-//const { Resolver } = require('dns')
 const NodeCache = require( "node-cache" )
 
 class Producers {
@@ -10,7 +9,7 @@ class Producers {
     this.bpJsonCache = new NodeCache({stdTTL: 5000})
     this.locationCache = new NodeCache({stdTTL: 10000})
     
-    this.geolocUrl = 'http://ip-api.com/json/'
+    this.geolocUrl = 'https://freegeoip.klokantech.com/json/'
     this.limit = 30
   }
 
@@ -30,7 +29,9 @@ class Producers {
     }
 
     producer.bp_json = bpJson
-    await Promise.all(producer.bp_json.nodes.map(this.loadNodeLocations.bind(this)))
+    if(producer.bp_json.nodes) {
+      await Promise.all(producer.bp_json.nodes.map(this.loadNodeLocations.bind(this)))
+    }
   }
 
   async loadNodeLocations(node) {
