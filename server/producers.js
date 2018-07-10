@@ -22,14 +22,14 @@ class Producers {
         console.log(`reloading bp.json ${url}`)
         let response = await request(url, {'timeout': 5000})
         bpJson = JSON.parse(response)
-        this.bpJsonCache.set(url, bpJson)
       } catch(err) {
-        bpJson = "error"
+        bpJson = null
       }
+      this.bpJsonCache.set(url, bpJson)
     }
 
     producer.bp_json = bpJson
-    if(producer.bp_json.nodes) {
+    if(producer.bp_json && producer.bp_json.nodes) {
       await Promise.all(producer.bp_json.nodes.map(this.loadNodeLocations.bind(this)))
     }
   }
@@ -52,12 +52,12 @@ class Producers {
       try {
         const url = `${this.geolocUrl}${hostname}`
         console.log(`geocoding ip ${hostname}`)
-        const response = await request(url)
+        const response = await request(url, {'timeout': 5000})
         location = JSON.parse(response)
-        this.locationCache.set(hostname, location)
       } catch(err) {
-        location = 'error'
+        location = null
       }
+      this.locationCache.set(hostname, location)
     }
 
     return location

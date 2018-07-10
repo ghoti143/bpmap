@@ -7,6 +7,7 @@
 <link rel='stylesheet' href='https://unpkg.com/leaflet@1.3.1/dist/leaflet.css' />
 
 <script src='https://unpkg.com/leaflet.markercluster@1.3.0/dist/leaflet.markercluster.js'></script>
+<script src='assets/leaflet-markercluster.placementstrategies.js'></script>
 <link rel='stylesheet' href='https://unpkg.com/leaflet.markercluster@1.3.0/dist/MarkerCluster.Default.css' />
 <link rel='stylesheet' href='https://unpkg.com/leaflet.markercluster@1.3.0/dist/MarkerCluster.css' />
 
@@ -14,10 +15,6 @@
 var bps = [];
 var myMap = null;
 var myMarkers = null;
-var apiMarkers = [];
-var p2pMarkers = [];
-var totalGets = 0;
-var currentLayers = "p2p";
 	
 function initMap() {
 	myMap = L.map('map');
@@ -33,14 +30,25 @@ function initMap() {
 
 	//myMap.attributionControl.setPrefix(false);
 	myMarkers = L.markerClusterGroup({
-		maxClusterRadius: 10
+		maxClusterRadius: 10,
+		spiderLegPolylineOptions: {weight: 0},
+		clockHelpingCircleOptions: {weight: 1.7, opacity: 1, color: 'black', fillOpacity: 0, dashArray: '10 5'},
+
+		elementsPlacementStrategy: 'concentric',
+		//helpingCircles: true,
+		//helpingCircleOptions: { fillOpacity: 0, color: 'black', weight: 0.6 },
+
+		//spiderfyDistanceSurplus: 25,
+		//spiderfyDistanceMultiplier: 10,
+
+		//elementsMultiplier: 1.4,
+		firstCircleElements: 8
 	});
 	myMap.addLayer(myMarkers);
 
 	$.get("/api/producers", function(data) {
 		bps = data;
 		processBPs();
-		addMarkersToMap();
 	});
 }
 	
@@ -50,32 +58,54 @@ function processBPs(){
 		var bp = bps[i];
 		var rank = i+1;
 
+		if (!bp.bp_json) continue;
+
 		for(var j = 0; j < bp.bp_json.nodes.length; j++) {
 			var node = bp.bp_json.nodes[j];
-			if(node.p2p_loc && node.p2p_loc.latitude) {
-				createMarker(bp, node, 'p2p', rank);
-			}
-			if(node.api_loc && node.api_loc.latitude) {
-				createMarker(bp, node, 'api', rank);
+			
+			if(node.p2p_loc && node.api_loc && node.p2p_loc.ip == node.api_loc.ip) {
+				//single marker
+				createMarker(bp.bp_json, {api: node.api_endpoint, p2p: node.p2p_endpoint}, node.api_loc, rank);
+			} else if(node.p2p_loc) {
+				createMarker(bp.bp_json, {p2p: node.p2p_endpoint}, node.p2p_loc, rank);
+			} else if(node.api_loc) {
+				createMarker(bp.bp_json, {api: node.api_endpoint}, node.api_loc, rank);
 			}
 		}
 	}
 }
 
-function createMarker(bp, node, type, rank) {
+function createMarker(bp_json, endpoints, loc, rank) {
 	
-	var locprop = type + '_loc';
-	var loc = node[locprop];
-	var marker = L.marker([loc.latitude, loc.longitude]);
+	var icon = L.icon({
+		iconUrl: 'assets/eos-logo.png',
+		iconSize:     [36, 36], // size of the icon
+    	//iconAnchor:   [18, 28], // point of the icon which will correspond to marker's location
+	   	//tooltipAnchor:  [0, -10] // point from which the popup should open relative to the iconAnchor
+	});
+	
+	var marker = L.marker([loc.latitude, loc.longitude], {icon: icon});
 
 	var img = "https://cdn.iconscout.com/public/images/icon/free/png-512/eos-cryptocurrency-crypto-currency-coin-logo-3cbf68c28ac9549e-512x512.png";
-	if(bp.bp_json.org.branding && bp.bp_json.org.branding.logo_256) {
-		img = bp.bp_json.org.branding.logo_256;
+	if(bp_json.org.branding && bp_json.org.branding.logo_256) {
+		img = bp_json.org.branding.logo_256;
 	}
 
-	var tooltip = '<h2>' + bp.bp_json.org.candidate_name + ' (' + rank.toString() + ')</h2>' +
-				 '<img style="height: 50;" src="' + img + '"></img><br />' + 
-				 '<b>' + node.api_endpoint + '</b> (' + loc.ip + ')'
+	var tooltip = '<h2>' + bp_json.org.candidate_name + ' (' + rank.toString() + ')</h2>' +
+				 '<img style="height: 50;" src="' + img + '"></img><br />';
+
+	var endpointHtml = '<b>{0}' + '</b> (' + loc.ip + ')';
+	
+	if(endpoints.api) {
+		tooltip += `<b>API: ${endpoints.api}</b> (${loc.ip})<br />`;
+	}
+
+	if(endpoints.p2p) {
+		tooltip += `<b>P2P: ${endpoints.p2p}</b> (${loc.ip})<br />`;
+	}
+
+	tooltip += `<span>${loc.city}, ${loc.country_name}</span>`;
+
 	marker.bindTooltip(tooltip);
 	/*
 	var popup = '<h1>' + bp.bp_json.org.candidate_name + '</h1>' +
@@ -85,36 +115,8 @@ function createMarker(bp, node, type, rank) {
 	marker.bindPopup(popup);
 	*/
 
-	if(type === 'p2p') {
-		p2pMarkers.push(marker);
-	} else {
-		apiMarkers.push(marker);
-	}	
+	myMarkers.addLayer(marker);
 }
-
-function addMarkersToMap() {
-	if(currentLayers === 'p2p') {
-
-		for(var i = 0; i < apiMarkers.length; i++) {
-			myMarkers.addLayer(apiMarkers[i]);
-		}
-		currentLayers = "api";
-	} else {
-		for(var i = 0; i < p2pMarkers.length; i++) {
-			myMarkers.addLayer(p2pMarkers[i]);
-		}
-		currentLayers = "p2p";
-	}
-}
-
-$(document).keypress(function(e) {
-  if(e.which == 13) {
-    // enter pressed
-    myMarkers.clearLayers();
-
-    addMarkersToMap();
-  }
-});
 
 
 </script>
