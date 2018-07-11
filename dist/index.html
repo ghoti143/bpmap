@@ -32,11 +32,11 @@ function initMap() {
 	myMarkers = L.markerClusterGroup({
 		maxClusterRadius: 10,
 		spiderLegPolylineOptions: {weight: 0},
-		clockHelpingCircleOptions: {weight: 1.7, opacity: 1, color: 'black', fillOpacity: 0, dashArray: '10 5'},
+		//clockHelpingCircleOptions: {weight: 1.7, opacity: 1, color: 'black', fillOpacity: 0, dashArray: '10 5'},
 
 		elementsPlacementStrategy: 'concentric',
-		//helpingCircles: true,
-		//helpingCircleOptions: { fillOpacity: 0, color: 'black', weight: 0.6 },
+		helpingCircles: true,
+		helpingCircleOptions: { fillOpacity: 0, color: 'black', weight: 0.6 },
 
 		//spiderfyDistanceSurplus: 25,
 		//spiderfyDistanceMultiplier: 10,
@@ -63,7 +63,12 @@ function processBPs(){
 		for(var j = 0; j < bp.bp_json.nodes.length; j++) {
 			var node = bp.bp_json.nodes[j];
 			
-			if(node.p2p_loc && node.api_loc && node.p2p_loc.ip == node.api_loc.ip) {
+			if(
+				node.p2p_loc && node.api_loc && (
+					(node.p2p_loc.ip == node.api_loc.ip) || 
+					((node.p2p_loc.latitude == node.api_loc.latitude) && (node.p2p_loc.longitude == node.api_loc.longitude))
+				)
+			) {
 				//single marker
 				createMarker(bp.bp_json, {api: node.api_endpoint, p2p: node.p2p_endpoint}, node.api_loc, rank);
 			} else if(node.p2p_loc) {
@@ -80,40 +85,40 @@ function createMarker(bp_json, endpoints, loc, rank) {
 	var icon = L.icon({
 		iconUrl: 'assets/eos-logo.png',
 		iconSize:     [36, 36], // size of the icon
-    	//iconAnchor:   [18, 28], // point of the icon which will correspond to marker's location
-	   	//tooltipAnchor:  [0, -10] // point from which the popup should open relative to the iconAnchor
+    	iconAnchor:   [18, 18], // point of the icon which will correspond to marker's location
+	   	tooltipAnchor:  [0, 0] // point from which the popup should open relative to the iconAnchor
 	});
 	
 	var marker = L.marker([loc.latitude, loc.longitude], {icon: icon});
-
-	var img = "https://cdn.iconscout.com/public/images/icon/free/png-512/eos-cryptocurrency-crypto-currency-coin-logo-3cbf68c28ac9549e-512x512.png";
+	
+	var img = "/assets/eos-logo.png";
 	if(bp_json.org.branding && bp_json.org.branding.logo_256) {
 		img = bp_json.org.branding.logo_256;
 	}
 
-	var tooltip = '<h2>' + bp_json.org.candidate_name + ' (' + rank.toString() + ')</h2>' +
-				 '<img style="height: 50;" src="' + img + '"></img><br />';
+	var popup = '<h2>' + bp_json.org.candidate_name + ' (' + rank.toString() + ')</h2>' +
+				 '<img style="max-height: 50;" src="' + img + '"></img><br />';
 
 	var endpointHtml = '<b>{0}' + '</b> (' + loc.ip + ')';
 	
 	if(endpoints.api) {
-		tooltip += `<b>API: ${endpoints.api}</b> (${loc.ip})<br />`;
+		popup += `<b>API: ${endpoints.api}</b> (${loc.ip})<br />`;
 	}
 
 	if(endpoints.p2p) {
-		tooltip += `<b>P2P: ${endpoints.p2p}</b> (${loc.ip})<br />`;
+		popup += `<b>P2P: ${endpoints.p2p}</b> (${loc.ip})<br />`;
 	}
 
-	tooltip += `<span>${loc.city}, ${loc.country_name}</span>`;
+	popup += `<span>${loc.city}, ${loc.country_name}</span>`;
 
-	marker.bindTooltip(tooltip);
-	/*
-	var popup = '<h1>' + bp.bp_json.org.candidate_name + '</h1>' +
-				'<img style="height: 50;" src="' + img + '"></img><br />' + 
-				'<span>' + loc.city + ', ' + loc.country_name + '</span>';
+	marker.bindPopup(popup, {className: 'popupFoo'});
+	marker.on('mouseover', function(event){
+		marker.openPopup();
+	});
 
-	marker.bindPopup(popup);
-	*/
+	//marker.on('mouseout', function(event){
+	//	marker.closePopup();
+	//});
 
 	myMarkers.addLayer(marker);
 }

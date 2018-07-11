@@ -13,6 +13,7 @@ L.MarkerCluster.include({
         var c = this._group;
         var d = c._map;
         var e = d.latLngToLayerPoint(this._latlng);
+        e.y -= 9; // had to tweak to make work with custom markers
         var f = [];
         if (!(this._group.getLayers()[0]instanceof L.CircleMarker)) {
             e.y += 10

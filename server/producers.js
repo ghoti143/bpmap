@@ -10,14 +10,14 @@ class Producers {
     this.locationCache = new NodeCache({stdTTL: 10000})
     
     this.geolocUrl = 'https://freegeoip.klokantech.com/json/'
-    this.limit = 30
+    this.limit = 100
   }
 
   async loadBpJson(producer) {
     const url = `${producer.url}/bp.json`
     let bpJson = this.bpJsonCache.get(url)
     
-    if(bpJson == undefined) {
+    if(bpJson === undefined) {
       try {
         console.log(`reloading bp.json ${url}`)
         let response = await request(url, {'timeout': 5000})
@@ -48,7 +48,7 @@ class Producers {
     const hostname = this.parseHost(endpoint)
     let location = this.locationCache.get(hostname)
 
-    if (location == undefined) {
+    if (location === undefined) {
       try {
         const url = `${this.geolocUrl}${hostname}`
         console.log(`geocoding ip ${hostname}`)
