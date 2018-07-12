@@ -30,7 +30,7 @@ function initMap() {
 
 	//myMap.attributionControl.setPrefix(false);
 	myMarkers = L.markerClusterGroup({
-		maxClusterRadius: 10,
+		maxClusterRadius: 20,
 		spiderLegPolylineOptions: {weight: 0},
 		//clockHelpingCircleOptions: {weight: 1.7, opacity: 1, color: 'black', fillOpacity: 0, dashArray: '10 5'},
 
@@ -92,13 +92,13 @@ function createMarker(bp_json, endpoints, loc, rank) {
 	
 	var marker = L.marker([loc.latitude, loc.longitude], {icon: icon});
 	
-	var img = "/assets/eos-logo.png";
+	var img;
 	if(bp_json.org.branding && bp_json.org.branding.logo_256) {
 		img = bp_json.org.branding.logo_256;
 	}
 
-	var popup = '<h2>' + bp_json.org.candidate_name + ' (' + rank.toString() + ')</h2>' +
-				 '<img style="max-height: 50;" src="' + img + '"></img><br />';
+	var popup = `<h2>${bp_json.org.candidate_name} (${rank.toString()})</h2>` +
+				`<img class="bp_logo" src="${img}"></img><br />`;
 
 	var endpointHtml = '<b>{0}' + '</b> (' + loc.ip + ')';
 	
@@ -112,14 +112,26 @@ function createMarker(bp_json, endpoints, loc, rank) {
 
 	popup += `<span>${loc.city}, ${loc.country_name}</span>`;
 
-	marker.bindPopup(popup, {className: 'popupFoo'});
+	var isHovering = false;
+	//var popup = new L.popup().setContent(popupContent);
+	marker.on('popupopen', (e) => {
+		$(e.popup._wrapper).hover(() => {
+			isHovering = true;
+		}, () => {
+			isHovering = false;
+			marker.closePopup();
+		});
+	})
+	marker.bindPopup(popup);
 	marker.on('mouseover', function(event){
 		marker.openPopup();
 	});
 
-	//marker.on('mouseout', function(event){
-	//	marker.closePopup();
-	//});
+	marker.on('mouseout', function(event){
+		setTimeout(() => {
+			if(!isHovering) marker.closePopup();
+		}, 500);
+	});
 
 	myMarkers.addLayer(marker);
 }
@@ -156,6 +168,11 @@ body {
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
+}
+
+img.bp_logo {
+  height: 50px;
+  background: url('/assets/eos_spinning_logo.gif') no-repeat;
 }
 
 </style>
