@@ -11,6 +11,8 @@
 <link rel='stylesheet' href='https://unpkg.com/leaflet.markercluster@1.3.0/dist/MarkerCluster.Default.css' />
 <link rel='stylesheet' href='https://unpkg.com/leaflet.markercluster@1.3.0/dist/MarkerCluster.css' />
 
+<script src='Marker.js'></script>
+
 <script>
 var bps = [];
 var myMap = null;
@@ -21,27 +23,20 @@ function initMap() {
 	myMap.fitWorld().zoomIn();
 		
 	var CartoDB_Positron = L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}{r}.png', {
-		//attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
+		attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
 		subdomains: 'abcd',
 		maxZoom: 19
 	});
 	
 	CartoDB_Positron.addTo(myMap);
 
-	//myMap.attributionControl.setPrefix(false);
+	myMap.attributionControl.setPrefix(false);
 	myMarkers = L.markerClusterGroup({
 		maxClusterRadius: 20,
 		spiderLegPolylineOptions: {weight: 0},
-		//clockHelpingCircleOptions: {weight: 1.7, opacity: 1, color: 'black', fillOpacity: 0, dashArray: '10 5'},
-
 		elementsPlacementStrategy: 'concentric',
 		helpingCircles: true,
 		helpingCircleOptions: { fillOpacity: 0, color: 'black', weight: 0.6 },
-
-		//spiderfyDistanceSurplus: 25,
-		//spiderfyDistanceMultiplier: 10,
-
-		//elementsMultiplier: 1.4,
 		firstCircleElements: 8
 	});
 	myMap.addLayer(myMarkers);
@@ -90,52 +85,37 @@ function createMarker(bp_json, endpoints, loc, rank) {
 	   	tooltipAnchor:  [0, 0] // point from which the popup should open relative to the iconAnchor
 	});
 	
-	var marker = L.marker([loc.latitude, loc.longitude], {icon: icon});
-	
-	var img;
+	var imgsrc;
 	if(bp_json.org.branding && bp_json.org.branding.logo_256) {
-		img = bp_json.org.branding.logo_256;
+		imgsrc = bp_json.org.branding.logo_256;
 	}
 
-	var popup = `<h2>${bp_json.org.candidate_name} (${rank.toString()})</h2>` +
-				`<img class="bp_logo" src="${img}"></img><br />`;
-
-	var endpointHtml = '<b>{0}' + '</b> (' + loc.ip + ')';
+	var marker = new Marker([loc.latitude, loc.longitude], {icon: icon}, imgsrc);
 	
+	var popup = `<h2>${bp_json.org.candidate_name}</h2>` +
+				'<div class="bp_logo_container">' +
+					'<img class="loading" src="/assets/eos_spinning_logo.gif"></img>' +
+					`<img class="actual" src="${imgsrc}"></img>` +
+				'</div>';
+				
+
+	popup += `<div class="info"><label>Rank:</label><span>${rank.toString()}</span></div>`;
+
 	if(endpoints.api) {
-		popup += `<b>API: ${endpoints.api}</b> (${loc.ip})<br />`;
+		popup += `<div class="info"><label>API:</label><span>${endpoints.api} (${loc.ip})</span></div>`;
 	}
 
 	if(endpoints.p2p) {
-		popup += `<b>P2P: ${endpoints.p2p}</b> (${loc.ip})<br />`;
+		popup += `<div class="info"><label>P2P:</label><span>${endpoints.p2p} (${loc.ip})</span></div>`;
 	}
 
-	popup += `<span>${loc.city}, ${loc.country_name}</span>`;
+	popup += `<div class="info"><label>Location:</label><span>${loc.city}, ${loc.country_name}</span><div>`;
 
-	var isHovering = false;
-	//var popup = new L.popup().setContent(popupContent);
-	marker.on('popupopen', (e) => {
-		$(e.popup._wrapper).hover(() => {
-			isHovering = true;
-		}, () => {
-			isHovering = false;
-			marker.closePopup();
-		});
-	})
-	marker.bindPopup(popup);
-	marker.on('mouseover', function(event){
-		marker.openPopup();
-	});
-
-	marker.on('mouseout', function(event){
-		setTimeout(() => {
-			if(!isHovering) marker.closePopup();
-		}, 500);
-	});
+	marker.bindPopup(popup);	
 
 	myMarkers.addLayer(marker);
-}
 
+}
 
 </script>
 
@@ -158,11 +138,10 @@ body {
     bottom: 0;
     background-color: rgba(0,0,0,0.5); /* Black background with opacity */
     z-index: 2000; /* Specify a stack order in case you're using a different order for other elements */
-    cursor: pointer; /* Add a pointer on hover */
 }
 
 #overlay-image {
-  height: 50%;
+  height: 40%;
   position: absolute;  
   top: 50%;
   left: 50%;
@@ -170,9 +149,38 @@ body {
   text-align: center;
 }
 
-img.bp_logo {
+.leaflet-popup-content-wrapper {
+	border-radius: 0;
+}
+
+.leaflet-popup-content div.bp_logo_container {
   height: 50px;
-  background: url('/assets/eos_spinning_logo.gif') no-repeat;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.leaflet-popup-content div.bp_logo_container img {
+	height: 100%;
+}
+
+.leaflet-popup-content h2 {
+	margin-bottom: 5px;
+}
+
+.leaflet-popup-content div.info label {
+	display: block;
+	width: 65px;
+	float: left;
+	font-weight: bold;
+}
+
+.leaflet-popup-content div.info span {
+	display: block;
+	margin-left: 65px;
+}
+
+.leaflet-popup-content h2 {
+	text-align: center;
 }
 
 </style>
