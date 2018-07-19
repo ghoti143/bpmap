@@ -3,22 +3,18 @@ function Marker(loc, opt, imgsrc) {
 	var marker = L.marker(loc, opt);
 	var isHovering = false;
 
-	var closePopup = function() {
+	var handleMouseOut = function(event) {
+		isHovering = false;
 		setTimeout(() => {
 			if(!isHovering) marker.closePopup();
 		}, 500);
-	};
-
-	var handleMouseOut = function(event) {
-		isHovering = false;
-		closePopup();
 	};
 
 	var handleMouseOver = function(event) {
         isHovering = true;
         if(!marker.isPopupOpen()) {
             marker.openPopup();
-        }        
+        }
 	};
 
 	var handlePopupOpen = function(event) {
