@@ -53,30 +53,63 @@ function processBPs(){
 	for (var i = 0; i < bps.length; i++) {
 		var bp = bps[i];
 		var rank = i+1;
+		var locs = {};
 
 		if (!bp.bp_json) continue;
 
 		for(var j = 0; j < bp.bp_json.nodes.length; j++) {
 			var node = bp.bp_json.nodes[j];
 			
-			if(
-				node.p2p_loc && node.api_loc && (
-					(node.p2p_loc.ip == node.api_loc.ip) || 
-					((node.p2p_loc.latitude == node.api_loc.latitude) && (node.p2p_loc.longitude == node.api_loc.longitude))
-				)
-			) {
-				//single marker
-				createMarker(bp.bp_json, {api: node.api_endpoint, p2p: node.p2p_endpoint}, node.api_loc, rank);
-			} else if(node.p2p_loc) {
-				createMarker(bp.bp_json, {p2p: node.p2p_endpoint}, node.p2p_loc, rank);
-			} else if(node.api_loc) {
-				createMarker(bp.bp_json, {api: node.api_endpoint}, node.api_loc, rank);
+			if(node.api_loc) {
+				var locKey = node.api_loc.latitude.toString() + ';' + node.api_loc.longitude.toString();
+
+				if(!locs[locKey]) {
+					locs[locKey] = {};
+					locs[locKey].eps = [];
+					locs[locKey].city = node.api_loc.city;
+					locs[locKey].country = node.api_loc.country_name;
+				}
+
+				locs[locKey].eps.push({type: 'API', domain: node.api_endpoint, ip: node.api_loc.ip});
 			}
+
+			if(node.p2p_loc) {
+				var locKey = node.p2p_loc.latitude.toString() + ';' + node.p2p_loc.longitude.toString();
+
+				if(!locs[locKey]) {
+					locs[locKey] = {};
+					locs[locKey].eps = [];
+					locs[locKey].city = node.p2p_loc.city;
+					locs[locKey].country = node.p2p_loc.country_name;
+				}
+
+				locs[locKey].eps.push({type: 'P2P', domain: node.p2p_endpoint, ip: node.p2p_loc.ip});
+
+			}
+		}
+
+		for(var prop in locs) {
+			createMarker(bp.bp_json, prop, locs[prop].eps, locs[prop].city, locs[prop].country, rank)
 		}
 	}
 }
 
-function createMarker(bp_json, endpoints, loc, rank) {
+function createEndpointHtml(type, domain, ip) {
+	var html = `<div class="info"><label>${type}:</label><span>`;
+
+	if(type === 'API') {
+		html += `<a target="_blank" href="${domain}/v1/chain/get_info">${domain}</a> `;
+	} else {
+		html += `${domain} `;
+	}
+
+	html += `(<a target="_blank" href="https://www.robtex.com/ip-lookup/${ip}">${ip}</a>)`;
+	html += '</span></div>';
+
+	return html;
+}
+
+function createMarker(bp_json, loc, eps, city, country, rank) {
 	
 	var icon = L.icon({
 		iconUrl: 'assets/eos-logo.png',
@@ -85,12 +118,12 @@ function createMarker(bp_json, endpoints, loc, rank) {
 	   	tooltipAnchor:  [0, 0] // point from which the popup should open relative to the iconAnchor
 	});
 	
-	var imgsrc;
+	var imgsrc = '/assets/broken_bike.png';
 	if(bp_json.org.branding && bp_json.org.branding.logo_256) {
 		imgsrc = bp_json.org.branding.logo_256;
 	}
 
-	var marker = new Marker([loc.latitude, loc.longitude], {icon: icon}, imgsrc);
+	var marker = new Marker([loc.split(';')[0], loc.split(';')[1]], {icon: icon}, imgsrc);
 	
 	var popup = `<h2>${bp_json.org.candidate_name}</h2>` +
 				'<div class="bp_logo_container">' +
@@ -101,20 +134,15 @@ function createMarker(bp_json, endpoints, loc, rank) {
 
 	popup += `<div class="info"><label>Rank:</label><span>${rank.toString()}</span></div>`;
 
-	if(endpoints.api) {
-		popup += `<div class="info"><label>API:</label><span>${endpoints.api} (${loc.ip})</span></div>`;
+	for(var i = 0; i < eps.length; i++) {
+		popup += createEndpointHtml(eps[i].type, eps[i].domain, eps[i].ip);
 	}
 
-	if(endpoints.p2p) {
-		popup += `<div class="info"><label>P2P:</label><span>${endpoints.p2p} (${loc.ip})</span></div>`;
-	}
-
-	popup += `<div class="info"><label>Location:</label><span>${loc.city}, ${loc.country_name}</span><div>`;
+	popup += `<div class="info"><label>Location:</label><span>${city}, ${country}</span><div>`;
 
 	marker.bindPopup(popup);	
 
 	myMarkers.addLayer(marker);
-
 }
 
 </script>

@@ -21,14 +21,15 @@ function Marker(loc, opt, imgsrc) {
         var $wrap = $(event.popup._wrapper);
         var $actual = $wrap.find('img.actual');
         var $loading = $wrap.find('img.loading');
-
-        $actual.on('load', (event) => {
+		var errCnt = 0;
+		
+		$actual.on('load', (event) => {
             $loading.hide();
             $actual.css('background-color','inherit');
         });
 
         $actual.on('error', (event) => {
-            $actual.hide();
+			$actual.attr('src', '/assets/broken_bike.png');
         })
 
 		$wrap.hover(handleMouseOver, handleMouseOut);
